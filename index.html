@@ -8,21 +8,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Alpine.js CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- jsQR for Barcode/QR Scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col justify-between" x-data="inventoryApp()">
 
     <!-- Top Mobile Header -->
     <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-20 px-4 py-3.5">
         <div class="max-w-md mx-auto flex items-center justify-between">
             <h1 class="text-lg font-bold tracking-tight">📦 Inventory Entry</h1>
-            <span class="text-xs bg-indigo-500 px-2.5 py-1 rounded-full font-medium text-indigo-100">Live Sync</span>
+            <div class="flex space-x-2">
+                <button @click="activeTab = 'form'" :class="activeTab === 'form' ? 'bg-indigo-700' : 'bg-indigo-500'" class="text-xs px-3 py-1 rounded-full font-medium transition">Form</button>
+                <button @click="activeTab = 'records'; fetchRecords()" :class="activeTab === 'records' ? 'bg-indigo-700' : 'bg-indigo-500'" class="text-xs px-3 py-1 rounded-full font-medium transition">Existing Data</button>
+            </div>
         </div>
     </header>
 
-    <!-- Main Content Form Container -->
-    <main class="max-w-md w-full mx-auto p-4 flex-grow" x-data="mobileInventoryForm()">
+    <!-- Main Content Container -->
+    <main class="max-w-md w-full mx-auto p-4 flex-grow">
         
-        <form @submit.prevent="submitData" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4 mb-8">
+        <!-- FORM VIEW -->
+        <form x-show="activeTab === 'form'" @submit.prevent="submitData" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4 mb-8">
             
             <!-- Item Name -->
             <div>
@@ -40,19 +46,55 @@
                     placeholder="Manufacturer name">
             </div>
 
-            <!-- Batch Number & Expiry -->
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Batch Number *</label>
-                    <input type="text" x-model="form.batchNumber" required 
+            <!-- Barcode / QR Code Field with Scanner Trigger -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Barcode / QR Code</label>
+                <div class="flex space-x-2">
+                    <input type="text" x-model="form.barcode" 
                         class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        placeholder="Batch code">
+                        placeholder="Scan or type code">
+                    <button type="button" @click="startScanner()" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-4 rounded-xl font-semibold text-xs transition">
+                        📷 Scan
+                    </button>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date *</label>
-                    <input type="date" x-model="form.expiry" required 
-                        class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <!-- Batch Number -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Batch Number *</label>
+                <input type="text" x-model="form.batchNumber" required 
+                    class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Batch code">
+            </div>
+
+            <!-- Custom Sequential Date Selector (Year -> Month -> Day) -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date (Year / Month / Day) *</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <!-- Year -->
+                    <select x-model="dateParts.year" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
+                        <option value="">Year</option>
+                        <template x-for="y in availableYears">
+                            <option :value="y" x-text="y"></option>
+                        </template>
+                    </select>
+                    <!-- Month -->
+                    <select x-model="dateParts.month" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
+                        <option value="">Month</option>
+                        <template x-for="m in availableMonths">
+                            <option :value="m.val" x-text="m.name"></option>
+                        </template>
+                    </select>
+                    <!-- Day -->
+                    <select x-model="dateParts.day" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
+                        <option value="">Day</option>
+                        <template x-for="d in getDaysInMonth()">
+                            <option :value="d" x-text="d"></option>
+                        </template>
+                    </select>
                 </div>
+                <input type="hidden" x-model="form.expiry" required>
+                <p class="text-xs text-slate-400 mt-1" x-text="form.expiry ? 'Combined: ' + form.expiry : 'Please select year, month, and day.'"></p>
             </div>
 
             <!-- Quantity -->
@@ -73,27 +115,25 @@
 
             <!-- Dedicated Camera & Gallery Photo Section -->
             <div class="pt-2">
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Attach Photos (Camera or Gallery)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Attach Photos (Multi-Camera / Gallery)</label>
                 
                 <div class="grid grid-cols-2 gap-3">
-                    <!-- Take Photo Button (Direct Camera Trigger) -->
+                    <!-- Take Photo Button -->
                     <label class="flex flex-col items-center justify-center border-2 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl p-3.5 cursor-pointer transition text-center">
                         <svg class="w-6 h-6 text-indigo-600 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
                         </svg>
                         <span class="text-xs font-semibold text-indigo-700">Take Photo</span>
-                        <!-- capture="environment" opens rear camera directly on mobile phones -->
                         <input type="file" @change="handleFiles" accept="image/*" capture="environment" class="hidden">
                     </label>
 
-                    <!-- Choose from Gallery Button (Allows multiple selection) -->
+                    <!-- Choose from Gallery Button -->
                     <label class="flex flex-col items-center justify-center border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-xl p-3.5 cursor-pointer transition text-center">
                         <svg class="w-6 h-6 text-slate-600 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
                         <span class="text-xs font-semibold text-slate-700">Gallery (Multi)</span>
-                        <!-- multiple allows picking several photos at once from phone album -->
                         <input type="file" @change="handleFiles" accept="image/*" multiple class="hidden">
                     </label>
                 </div>
@@ -114,7 +154,7 @@
 
             <!-- Status Alerts -->
             <template x-if="statusMessage">
-                <div :class="statusType === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-emerald-200'" 
+                <div :class="statusType === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'" 
                      class="p-3.5 rounded-xl border text-sm font-medium text-center" x-text="statusMessage"></div>
             </template>
 
@@ -133,7 +173,47 @@
                 </button>
             </div>
         </form>
+
+        <!-- EXISTING RECORDS TAB VIEW -->
+        <div x-show="activeTab === 'records'" class="space-y-4">
+            <div class="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200">
+                <h2 class="text-sm font-bold text-slate-700">Sheet Data Sync</h2>
+                <button @click="fetchRecords()" class="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg font-semibold">Refresh</button>
+            </div>
+
+            <div class="space-y-3">
+                <template x-if="fetchingRecords">
+                    <p class="text-center text-xs text-slate-400 py-6">Loading records from Google Sheet...</p>
+                </template>
+                <template x-if="!fetchingRecords && records.length === 0">
+                    <p class="text-center text-xs text-slate-400 py-6">No records found.</p>
+                </template>
+                <template x-for="row in records">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-1 text-xs">
+                        <div class="flex justify-between font-bold text-slate-800 text-sm">
+                            <span x-text="row.item"></span>
+                            <span class="text-indigo-600" x-text="'Qty: ' + row.qty"></span>
+                        </div>
+                        <p class="text-slate-500" x-text="'Manufacturer: ' + row.manufacturer"></p>
+                        <p class="text-slate-500" x-text="'Batch: ' + row.batchNumber + ' | Expiry: ' + row.expiry"></p>
+                        <p class="text-slate-400" x-text="'Scanned Code: ' + (row.barcode || 'None')"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
     </main>
+
+    <!-- Scanner Modal Overlay -->
+    <div x-show="scanning" class="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-2xl overflow-hidden max-w-sm w-full p-4 relative space-y-3">
+            <h3 class="font-bold text-sm text-center">Scan Barcode / QR Code</h3>
+            <div class="relative aspect-square bg-black rounded-xl overflow-hidden">
+                <video id="scanner-video" class="w-full h-full object-cover"></video>
+            </div>
+            <button @click="stopScanner()" class="w-full bg-slate-200 text-slate-800 font-semibold py-2.5 rounded-xl text-xs">Cancel Scan</button>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="text-center py-4 text-xs text-slate-400">
@@ -141,20 +221,58 @@
     </footer>
 
     <script>
-        function mobileInventoryForm() {
+        function inventoryApp() {
             return {
+                activeTab: 'form',
                 form: {
                     item: '',
                     manufacturer: '',
+                    barcode: '',
                     batchNumber: '',
                     expiry: '',
                     qty: '',
                     remarks: '',
                     photos: []
                 },
+                dateParts: {
+                    year: '',
+                    month: '',
+                    day: ''
+                },
+                availableYears: [],
+                availableMonths: [
+                    {val: '01', name: 'Jan'}, {val: '02', name: 'Feb'}, {val: '03', name: 'Mar'},
+                    {val: '04', name: 'Apr'}, {val: '05', name: 'May'}, {val: '06', name: 'Jun'},
+                    {val: '07', name: 'Jul'}, {val: '08', name: 'Aug'}, {val: '09', name: 'Sep'},
+                    {val: '10', name: 'Oct'}, {val: '11', name: 'Nov'}, {val: '12', name: 'Dec'}
+                ],
                 loading: false,
+                fetchingRecords: false,
                 statusMessage: '',
                 statusType: '',
+                records: [],
+                scanning: false,
+                videoStream: null,
+
+                init() {
+                    const currentYear = new Date().getFullYear();
+                    for (let y = currentYear; y <= currentYear + 15; y++) {
+                        this.availableYears.push(y);
+                    }
+                },
+
+                getDaysInMonth() {
+                    if (!this.dateParts.year || !this.dateParts.month) return 31;
+                    return new Date(this.dateParts.year, this.dateParts.month, 0).getDate();
+                },
+
+                updateExpiryDate() {
+                    if (this.dateParts.year && this.dateParts.month && this.dateParts.day) {
+                        this.form.expiry = `${this.dateParts.year}-${this.dateParts.month}-${String(this.dateParts.day).padStart(2, '0')}`;
+                    } else {
+                        this.form.expiry = '';
+                    }
+                },
 
                 handleFiles(event) {
                     const files = event.target.files;
@@ -170,7 +288,6 @@
                         };
                         reader.readAsDataURL(file);
                     }
-                    // Reset input value so picking the same file again triggers change if needed
                     event.target.value = '';
                 },
 
@@ -178,11 +295,54 @@
                     this.form.photos.splice(index, 1);
                 },
 
+                startScanner() {
+                    this.scanning = true;
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
+                        this.videoStream = stream;
+                        const videoElement = document.getElementById('scanner-video');
+                        videoElement.srcObject = stream;
+                        videoElement.setAttribute("playsinline", true);
+                        videoElement.play();
+                        requestAnimationFrame(() => this.tickScanner());
+                    }).catch(err => {
+                        alert("Camera access denied or unavailable.");
+                        this.scanning = false;
+                    });
+                },
+
+                tickScanner() {
+                    if (!this.scanning) return;
+                    const video = document.getElementById('scanner-video');
+                    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+                        const canvasElement = document.createElement("canvas");
+                        canvasElement.height = video.videoHeight;
+                        canvasElement.width = video.videoWidth;
+                        const canvas = canvasElement.getContext("2d");
+                        canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                        const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                        if (code) {
+                            this.form.barcode = code.data;
+                            this.stopScanner();
+                            return;
+                        }
+                    }
+                    requestAnimationFrame(() => this.tickScanner());
+                },
+
+                stopScanner() {
+                    this.scanning = false;
+                    if (this.videoStream) {
+                        this.videoStream.getTracks().forEach(track => track.stop());
+                        this.videoStream = null;
+                    }
+                },
+
                 async submitData() {
                     this.loading = true;
                     this.statusMessage = '';
                     
-                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwQZcWEFBZz6ibzATU3b3JZTFYgxqtOMWkExX5hvQNNdgo-XjfBmFyYviy6a14ibBPM/exec'; // Replace with your deployment URL
+                    const WEB_APP_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'; 
 
                     try {
                         const response = await fetch(WEB_APP_URL, {
@@ -194,7 +354,8 @@
                         if (result.status === 'success') {
                             this.statusType = 'success';
                             this.statusMessage = 'Item logged successfully to sheet!';
-                            this.form = { item: '', manufacturer: '', batchNumber: '', expiry: '', qty: '', remarks: '', photos: [] };
+                            this.form = { item: '', manufacturer: '', barcode: '', batchNumber: '', expiry: '', qty: '', remarks: '', photos: [] };
+                            this.dateParts = { year: '', month: '', day: '' };
                         } else {
                             throw new Error(result.message);
                         }
@@ -204,6 +365,20 @@
                     } finally {
                         this.loading = false;
                         window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                },
+
+                async fetchRecords() {
+                    this.fetchingRecords = true;
+                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzaP_09LpbpgNxjycxNVVebxOrcKTxhJctm_KPuuIRn6I-Mfc1JYaBb-Mlxc1vCOg0c/exec';
+                    try {
+                        const response = await fetch(WEB_APP_URL + '?action=getRecords');
+                        const data = await response.json();
+                        this.records = data.rows || [];
+                    } catch (err) {
+                        console.error(err);
+                    } finally {
+                        this.fetchingRecords = false;
                     }
                 }
             }
