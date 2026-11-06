@@ -67,26 +67,28 @@
                     placeholder="Batch code">
             </div>
 
-            <!-- Custom Sequential Date Selector (Year -> Month -> Day) -->
+            <!-- Custom Sequential Date Selector (Year -> Month -> Day with Conditional Display) -->
             <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date (Year / Month / Day) *</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date *</label>
                 <div class="grid grid-cols-3 gap-2">
-                    <!-- Year -->
-                    <select x-model="dateParts.year" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
+                    <!-- Year (Always shown, 10 years including current) -->
+                    <select x-model="dateParts.year" @change="onYearChange" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
                         <option value="">Year</option>
                         <template x-for="y in availableYears">
                             <option :value="y" x-text="y"></option>
                         </template>
                     </select>
-                    <!-- Month -->
-                    <select x-model="dateParts.month" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
+
+                    <!-- Month (Shown only when Year is selected) -->
+                    <select x-show="dateParts.year" x-model="dateParts.month" @change="onMonthChange" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
                         <option value="">Month</option>
                         <template x-for="m in availableMonths">
                             <option :value="m.val" x-text="m.name"></option>
                         </template>
                     </select>
-                    <!-- Day -->
-                    <select x-model="dateParts.day" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
+
+                    <!-- Day (Shown only when Month is selected) -->
+                    <select x-show="dateParts.month" x-model="dateParts.day" @change="updateExpiryDate" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
                         <option value="">Day</option>
                         <template x-for="d in getDaysInMonth()">
                             <option :value="d" x-text="d"></option>
@@ -94,7 +96,7 @@
                     </select>
                 </div>
                 <input type="hidden" x-model="form.expiry" required>
-                <p class="text-xs text-slate-400 mt-1" x-text="form.expiry ? 'Combined: ' + form.expiry : 'Please select year, month, and day.'"></p>
+                <p class="text-xs text-slate-400 mt-1" x-text="form.expiry ? 'Combined: ' + form.expiry : 'Please select Year, Month, then Day.'"></p>
             </div>
 
             <!-- Quantity -->
@@ -256,9 +258,21 @@
 
                 init() {
                     const currentYear = new Date().getFullYear();
-                    for (let y = currentYear; y <= currentYear + 15; y++) {
+                    // Generate current year to next 10 years (total 11 years)
+                    for (let y = currentYear; y <= currentYear + 10; y++) {
                         this.availableYears.push(y);
                     }
+                },
+
+                onYearChange() {
+                    this.dateParts.month = '';
+                    this.dateParts.day = '';
+                    this.form.expiry = '';
+                },
+
+                onMonthChange() {
+                    this.dateParts.day = '';
+                    this.form.expiry = '';
                 },
 
                 getDaysInMonth() {
