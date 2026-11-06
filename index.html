@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Inventory Mobile Logger</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+    <!-- Top Mobile Header -->
+    <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-20 px-4 py-3.5">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <h1 class="text-lg font-bold tracking-tight">📦 Inventory Entry</h1>
+            <span class="text-xs bg-indigo-500 px-2.5 py-1 rounded-full font-medium text-indigo-100">Live Sync</span>
+        </div>
+    </header>
+
+    <!-- Main Content Form Container -->
+    <main class="max-w-md w-full mx-auto p-4 flex-grow" x-data="mobileInventoryForm()">
+        
+        <form @submit.prevent="submitData" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4 mb-8">
+            
+            <!-- Item Name -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Item Name *</label>
+                <input type="text" x-model="form.item" required 
+                    class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Enter item description">
+            </div>
+
+            <!-- Manufacturer -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Manufacturer *</label>
+                <input type="text" x-model="form.manufacturer" required 
+                    class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Manufacturer name">
+            </div>
+
+            <!-- Batch Number & Expiry (Stacked nicely on mobile) -->
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Batch Number *</label>
+                    <input type="text" x-model="form.batchNumber" required 
+                        class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        placeholder="Batch code">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date *</label>
+                    <input type="date" x-model="form.expiry" required 
+                        class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Quantity -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Quantity (Qty) *</label>
+                <input type="number" x-model="form.qty" required min="1"
+                    class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Total units">
+            </div>
+
+            <!-- Remarks -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Remarks</label>
+                <textarea x-model="form.remarks" rows="2" 
+                    class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Optional notes..."></textarea>
+            </div>
+
+            <!-- Multiple Photo Upload (Mobile Optimized Camera / Gallery Picker) -->
+            <div class="pt-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Attach Photos (Multiple)</label>
+                <label class="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer transition">
+                    <svg class="w-8 h-8 text-indigo-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-indigo-600">Tap to capture or upload images</span>
+                    <input type="file" @change="handleFiles" accept="image/*" multiple class="hidden">
+                </label>
+
+                <!-- Thumbnail Previews -->
+                <div class="grid grid-cols-4 gap-2 mt-3" x-show="form.photos.length > 0">
+                    <template x-for="(photo, index) in form.photos" :key="index">
+                        <div class="relative aspect-square rounded-lg border border-slate-200 overflow-hidden shadow-xs bg-slate-100">
+                            <img :src="photo.base64" class="w-full h-full object-cover">
+                            <button type="button" @click="removePhoto(index)" 
+                                class="absolute top-1 right-1 bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+                                &times;
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Status Alerts -->
+            <template x-if="statusMessage">
+                <div :class="statusType === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'" 
+                     class="p-3.5 rounded-xl border text-sm font-medium text-center" x-text="statusMessage"></div>
+            </template>
+
+            <!-- Sticky/Action Submit Button -->
+            <div class="pt-3">
+                <button type="submit" :disabled="loading"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold py-3.5 px-4 rounded-xl transition duration-150 flex items-center justify-center space-x-2 shadow-lg shadow-indigo-200 disabled:opacity-50">
+                    <span x-show="!loading" class="text-base">Submit Record</span>
+                    <span x-show="loading" class="flex items-center space-x-2">
+                        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-base">Uploading Data...</span>
+                    </span>
+                </button>
+            </div>
+        </form>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-xs text-slate-400">
+        Inventory Mobile Portal &bull; Powered by Google Sheets
+    </footer>
+
+    <script>
+        function mobileInventoryForm() {
+            return {
+                form: {
+                    item: '',
+                    manufacturer: '',
+                    batchNumber: '',
+                    expiry: '',
+                    qty: '',
+                    remarks: '',
+                    photos: []
+                },
+                loading: false,
+                statusMessage: '',
+                statusType: '',
+
+                handleFiles(event) {
+                    const files = event.target.files;
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.form.photos.push({
+                                name: file.name,
+                                type: file.type,
+                                base64: e.target.result
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                removePhoto(index) {
+                    this.form.photos.splice(index, 1);
+                },
+
+                async submitData() {
+                    this.loading = true;
+                    this.statusMessage = '';
+                    
+                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbymZ-H3ay-zwIhDdKx-k5VALGmyLgAiynPxspLCfroeo6CkECUlMZzcgGnp83KtawQO/exec'; // Replace with your deployment URL
+
+                    try {
+                        const response = await fetch(WEB_APP_URL, {
+                            method: 'POST',
+                            body: JSON.stringify(this.form)
+                        });
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            this.statusType = 'success';
+                            this.statusMessage = 'Item logged successfully to sheet!';
+                            this.form = { item: '', manufacturer: '', batchNumber: '', expiry: '', qty: '', remarks: '', photos: [] };
+                        } else {
+                            throw new Error(result.message);
+                        }
+                    } catch (error) {
+                        this.statusType = 'error';
+                        this.statusMessage = 'Submission failed. Check network.';
+                    } finally {
+                        this.loading = false;
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
