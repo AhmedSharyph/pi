@@ -30,6 +30,19 @@
         <!-- FORM VIEW -->
         <form x-show="activeTab === 'form'" @submit.prevent="submitData" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4 mb-8">
             
+            <!-- Item Group Selection -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Item Group *</label>
+                <select x-model="form.itemGroup" @change="onGroupChange" required
+                    class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="">Select Item Group</option>
+                    <option value="Vaccines">Vaccines</option>
+                    <option value="Injection Equipment">Injection Equipment</option>
+                    <option value="Vaccination Cards">Vaccination Cards</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
             <!-- Item Name -->
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Item Name *</label>
@@ -38,10 +51,10 @@
                     placeholder="Enter item description">
             </div>
 
-            <!-- Manufacturer -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Manufacturer *</label>
-                <input type="text" x-model="form.manufacturer" required 
+            <!-- Manufacturer (Hidden for Cards) -->
+            <div x-show="form.itemGroup !== 'Vaccination Cards'">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Manufacturer <span x-show="requiresDetails()">*</span></label>
+                <input type="text" x-model="form.manufacturer" :required="requiresDetails()" 
                     class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     placeholder="Manufacturer name">
             </div>
@@ -59,19 +72,19 @@
                 </div>
             </div>
 
-            <!-- Batch Number -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Batch Number *</label>
-                <input type="text" x-model="form.batchNumber" required 
+            <!-- Batch Number (Hidden for Cards) -->
+            <div x-show="form.itemGroup !== 'Vaccination Cards'">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Batch Number <span x-show="requiresDetails()">*</span></label>
+                <input type="text" x-model="form.batchNumber" :required="requiresDetails()" 
                     class="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-base bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     placeholder="Batch code">
             </div>
 
-            <!-- Custom Sequential Date Selector (Year -> Month -> Day with Conditional Display) -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date *</label>
+            <!-- Expiry Date (Hidden for Cards) -->
+            <div x-show="form.itemGroup !== 'Vaccination Cards'">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Expiry Date <span x-show="requiresDetails()">*</span></label>
                 <div class="grid grid-cols-3 gap-2">
-                    <!-- Year (Always shown, 10 years including current) -->
+                    <!-- Year -->
                     <select x-model="dateParts.year" @change="onYearChange" class="rounded-xl border border-slate-300 p-3 text-sm bg-slate-50 focus:bg-white focus:outline-none">
                         <option value="">Year</option>
                         <template x-for="y in availableYears">
@@ -95,7 +108,7 @@
                         </template>
                     </select>
                 </div>
-                <input type="hidden" x-model="form.expiry" required>
+                <input type="hidden" x-model="form.expiry" :required="requiresDetails()">
                 <p class="text-xs text-slate-400 mt-1" x-text="form.expiry ? 'Combined: ' + form.expiry : 'Please select Year, Month, then Day.'"></p>
             </div>
 
@@ -196,8 +209,9 @@
                             <span x-text="row.item"></span>
                             <span class="text-indigo-600" x-text="'Qty: ' + row.qty"></span>
                         </div>
-                        <p class="text-slate-500" x-text="'Manufacturer: ' + row.manufacturer"></p>
-                        <p class="text-slate-500" x-text="'Batch: ' + row.batchNumber + ' | Expiry: ' + row.expiry"></p>
+                        <p class="text-indigo-500 font-semibold" x-text="'Group: ' + (row.itemGroup || 'General')"></p>
+                        <p class="text-slate-500" x-text="'Manufacturer: ' + (row.manufacturer || 'N/A')"></p>
+                        <p class="text-slate-500" x-text="'Batch: ' + (row.batchNumber || 'N/A') + ' | Expiry: ' + (row.expiry || 'N/A')"></p>
                         <p class="text-slate-400" x-text="'Scanned Code: ' + (row.barcode || 'None')"></p>
                     </div>
                 </template>
@@ -227,6 +241,7 @@
             return {
                 activeTab: 'form',
                 form: {
+                    itemGroup: '',
                     item: '',
                     manufacturer: '',
                     barcode: '',
@@ -258,9 +273,21 @@
 
                 init() {
                     const currentYear = new Date().getFullYear();
-                    // Generate current year to next 10 years (total 11 years)
                     for (let y = currentYear; y <= currentYear + 10; y++) {
                         this.availableYears.push(y);
+                    }
+                },
+
+                requiresDetails() {
+                    return this.form.itemGroup === 'Vaccines' || this.form.itemGroup === 'Injection Equipment';
+                },
+
+                onGroupChange() {
+                    if (this.form.itemGroup === 'Vaccination Cards') {
+                        this.form.manufacturer = '';
+                        this.form.batchNumber = '';
+                        this.form.expiry = '';
+                        this.dateParts = { year: '', month: '', day: '' };
                     }
                 },
 
@@ -356,7 +383,7 @@
                     this.loading = true;
                     this.statusMessage = '';
                     
-                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyqaKrkUAuWq_O4kIdY2pEyIBdBpyJw6_uLsHX_f5K7sWN7LEk5t8cvHpH7NdFOGj95/exec'; 
+                    const WEB_APP_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'; 
 
                     try {
                         const response = await fetch(WEB_APP_URL, {
@@ -368,7 +395,7 @@
                         if (result.status === 'success') {
                             this.statusType = 'success';
                             this.statusMessage = 'Item logged successfully to sheet!';
-                            this.form = { item: '', manufacturer: '', barcode: '', batchNumber: '', expiry: '', qty: '', remarks: '', photos: [] };
+                            this.form = { itemGroup: '', item: '', manufacturer: '', barcode: '', batchNumber: '', expiry: '', qty: '', remarks: '', photos: [] };
                             this.dateParts = { year: '', month: '', day: '' };
                         } else {
                             throw new Error(result.message);
@@ -384,7 +411,7 @@
 
                 async fetchRecords() {
                     this.fetchingRecords = true;
-                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzaP_09LpbpgNxjycxNVVebxOrcKTxhJctm_KPuuIRn6I-Mfc1JYaBb-Mlxc1vCOg0c/exec';
+                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwApLsu0jlQFA0qnUJEebsQ8faghZ_e9rL9GruBLW2jGE72Wcc2ilxMxNFDlWL3-XFV/exec';
                     try {
                         const response = await fetch(WEB_APP_URL + '?action=getRecords');
                         const data = await response.json();
