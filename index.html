@@ -411,7 +411,7 @@
 
                 async fetchRecords() {
                     this.fetchingRecords = true;
-                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwApLsu0jlQFA0qnUJEebsQ8faghZ_e9rL9GruBLW2jGE72Wcc2ilxMxNFDlWL3-XFV/exec';
+                    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx1xDana38hzFDP3q3MkRAtC6OGYSJLNvBWLGkv2BjkK2yM4z4daKAgkBmNkv_oAXFp/exec';
                     try {
                         const response = await fetch(WEB_APP_URL + '?action=getRecords');
                         const data = await response.json();
